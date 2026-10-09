@@ -1,2 +1,2 @@
-import {getUser} from '../../auth';import {organize} from '../../organizer';
-export async function POST(req:Request){const u=await getUser();if(!u)return Response.json({error:'Inicia sesión'},{status:401});const b:any=await req.json();if(typeof b.text!=='string'||!b.text.trim()||b.text.length>4000)return Response.json({error:'Escribe hasta 4.000 caracteres.'},{status:400});return Response.json(await organize(u.userId,b.text.trim()))}
+import {readJson,badJson} from '../../../lib/http';import {getUser} from '../../auth';import {organize} from '../../organizer';
+export async function POST(req:Request){const u=await getUser();if(!u)return Response.json({error:'Inicia sesión'},{status:401});const b=await readJson(req);if(!b)return badJson();if(typeof b.text!=='string'||!b.text.trim()||b.text.length>4000)return Response.json({error:'Escribe hasta 4.000 caracteres.'},{status:400});return Response.json(await organize(u.userId,b.text.trim()))}
