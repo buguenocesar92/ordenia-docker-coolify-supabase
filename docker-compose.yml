@@ -1,5 +1,7 @@
 services:
+  # Migración MANUAL: no corre en `up` ni en el despliegue. Ver docs/DESPLIEGUE-COOLIFY-SUPABASE.md.
   migrate:
+    profiles: ["migrate"]
     build: .
     restart: "no"
     command: ["node", "scripts/migrate.mjs"]
@@ -9,9 +11,6 @@ services:
   web:
     build: .
     restart: unless-stopped
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
     expose:
       - "3000"
     environment:

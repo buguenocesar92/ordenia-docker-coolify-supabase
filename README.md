@@ -92,14 +92,14 @@ Las variables se leen en ejecución; no se necesitan secretos como argumentos de
 2. En Coolify crea una aplicación desde ese repositorio y elige **Docker Compose**.
 3. Selecciona `/docker-compose.yml` como archivo Compose.
 4. Rellena las variables obligatorias: `APP_URL`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DATABASE_URL`, `DATABASE_SSL`, `N8N_INGEST_TOKEN` y `TZ`.
-5. Configura el dominio de **web** hacia su puerto interno **3000**, por ejemplo `https://ordenia.tudominio.cl:3000` cuando Coolify pida el puerto en el campo de dominio. El puerto no aparece en la URL pública final. No asignes dominio al servicio `migrate`.
-6. Despliega. `migrate` termina con código 0 al aplicar la migración; la web espera su finalización. Las migraciones ya aplicadas se omiten.
+5. Configura el dominio de **web** hacia su puerto interno **3000**, por ejemplo `https://ordenia.tudominio.cl:3000` cuando Coolify pida el puerto en el campo de dominio. El puerto no aparece en la URL pública final. El servicio `migrate` no se despliega solo (perfil `migrate`).
+6. Antes del primer arranque, revisa `supabase/migrations/001_ordenia.sql` y aplícala **a mano** (`docker compose --profile migrate run --rm migrate`; ver `docs/DESPLIEGUE-COOLIFY-SUPABASE.md`, «Migraciones»). Luego despliega: la web ya no ejecuta migraciones por sí sola.
 7. Comprueba `https://ordenia.tudominio.cl/api/health`; debe responder `{"ok":true}`. Luego abre `/login`.
 8. Crea tu cuenta, confirma el correo e inicia sesión. Guarda una nota y recarga para verificar persistencia.
 
 Si Coolify no permite elegir varios archivos Compose para WhatsApp, usa el archivo combinado `docker-compose.coolify-whatsapp.yml` incluido. No añadas WhatsApp antes de completar sus credenciales, porque el receptor necesita esos valores para arrancar.
 
-Coolify administra el proxy HTTPS; esta aplicación no publica los puertos 3000/8789 en todas las interfaces. La base de datos vive fuera del contenedor web, en Supabase. No necesitas un volumen de datos para la web. El servicio de migración terminado es normal.
+Coolify administra el proxy HTTPS; esta aplicación no publica los puertos 3000/8789 en todas las interfaces. La base de datos vive fuera del contenedor web, en Supabase. No necesitas un volumen de datos para la web. 
 
 ## 4. Prueba local con Docker
 
@@ -107,13 +107,15 @@ Coolify administra el proxy HTTPS; esta aplicación no publica los puertos 3000/
 cp .env.example .env
 # Editar .env con las credenciales del proyecto Supabase.
 # APP_URL=http://localhost:3000; añadir esta URL al Auth de tu proyecto de prueba.
+# En una base de pruebas nueva, aplica antes la migración a mano:
+docker compose --profile migrate run --rm migrate
 docker compose -f docker-compose.yml -f docker-compose.local.yml up --build -d
 ```
 
 Abre `http://localhost:3000`. Usa un proyecto Supabase de pruebas. Para diagnóstico:
 
 ```bash
-docker compose logs --tail=100 migrate web
+docker compose logs --tail=100 web
 ```
 
 ## 5. Conectar WhatsApp

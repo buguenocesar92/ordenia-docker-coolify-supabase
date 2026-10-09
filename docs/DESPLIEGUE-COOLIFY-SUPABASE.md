@@ -24,11 +24,28 @@ Hasta que eso esté hecho, los pasos de abajo no se pueden ejecutar.
      `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ASSISTANT_NUMBER`.
 4. 👤 **App Docker Compose en Coolify.** New Resource > Docker Compose desde el repo; archivo
    `docker-compose.yml` (o `docker-compose.coolify-whatsapp.yml` si se activa WhatsApp).
-   Atención: el servicio `migrate` aplica la migración 001 automáticamente contra `DATABASE_URL` en cada despliegue.
-   Revisar `supabase/migrations/001_ordenia.sql` antes del primer despliegue.
+   Las migraciones **no se aplican solas**: el servicio `migrate` está bajo `profiles: ["migrate"]` y `web` no depende
+   de él, así que ni `docker compose up` ni un despliegue de Coolify lo ejecutan. Ver "Migraciones (manual)" abajo.
 5. 👤 **Dominio con puerto interno 3000.** En el servicio `web`, dominio `https://<dominio-ordenia>:3000`
    (el `:3000` es el puerto interno al que apunta el proxy, no se publica al host). Los compose usan `expose`, no `ports`.
 6. 👤 **Meta (opcional, después).** Webhook `https://<dominio-webhook>/webhooks/whatsapp` con el verify token del paso 3.
    El servicio `whatsapp` expone el 8789 interno.
 7. **Comprobación.** `curl -fsS https://<dominio-ordenia>/api/health` debe responder `{"ok":true}`
    (503 = la app no llega a la base). Luego 👤 crear dos cuentas y verificar que cada una ve solo sus datos.
+
+## Migraciones (manual, nunca automáticas en producción)
+
+Regla: nada toca el esquema de producción sin que una persona haya leído el SQL antes.
+
+1. 👤 Hacer respaldo de la base (y comprobar que se puede restaurar).
+2. 👤 Leer `supabase/migrations/*.sql` (hoy `001_ordenia.sql`). Las incluidas no eliminan tablas; las futuras hay que
+   revisarlas igual. `scripts/migrate.mjs` registra lo aplicado en `ordenia.migrations`, así que repetirlo no duplica.
+3. 👤 Aplicar a mano, con una de estas dos vías:
+   - Dejando que el script lo haga, solo tras revisar: desde el servidor con el repo desplegado,
+     `docker compose --profile migrate run --rm migrate` (usa `DATABASE_URL` y `DATABASE_SSL` del entorno).
+     En Coolify, abrir la terminal del recurso o hacerlo por SSH en el host; no añadir `migrate` como servicio de despliegue.
+   - O ejecutando el SQL revisado con `psql` contra la base, con una URL de administración que no se guarde en el repo.
+4. Desplegar/reiniciar `web` y comprobar `/api/health`.
+
+Se validó con `docker compose config` que `migrate` solo aparece con `--profile migrate`. No se probó cómo trata
+Coolify los perfiles de Compose: tras el primer despliegue, confirmar que no levantó `migrate`.
