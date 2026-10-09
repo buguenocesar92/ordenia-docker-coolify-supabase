@@ -9,3 +9,7 @@ test('login/actions.ts no vuelca error.message de Supabase a la URL',()=>{
  const src=readFileSync(new URL('../app/login/actions.ts',import.meta.url),'utf8');
  assert.doesNotMatch(src,/error\??\.message/);
 });
+test('login/actions.ts aplica el limitador de intentos por IP y por correo',()=>{
+ const src=readFileSync(new URL('../app/login/actions.ts',import.meta.url),'utf8');
+ assert.match(src,/loginLimiter\(\)/);assert.match(src,/RATE_LIMITED/);
+});

@@ -1,8 +1,11 @@
 'use server';
 import {supabase} from '../../lib/supabase/server';
 import {redirect} from 'next/navigation';
-import {failureUrl} from '../../lib/auth-messages';
-export async function authenticate(form:FormData){const email=String(form.get('email')||'').trim(),password=String(form.get('password')||''),mode=String(form.get('mode')||'login');const client=await supabase();let error;
+import {headers} from 'next/headers';
+import {failureUrl,RATE_LIMITED} from '../../lib/auth-messages';
+import {loginLimiter} from '../../lib/limits';
+import {clientIp} from '../../lib/rate-limit';
+export async function authenticate(form:FormData){const email=String(form.get('email')||'').trim(),password=String(form.get('password')||''),mode=String(form.get('mode')||'login');const l=loginLimiter(),h=await headers();if(!l.check('ip:'+clientIp(h)).ok||!l.check('email:'+email.toLowerCase()).ok)redirect('/login?message='+encodeURIComponent(RATE_LIMITED));const client=await supabase();let error;
  if(mode==='signup'){({error}=await client.auth.signUp({email,password,options:{emailRedirectTo:process.env.APP_URL+'/auth/confirm'}}));if(!error)redirect('/login?message=Revisa+tu+correo+para+confirmar+tu+cuenta');}
  else if(mode==='reset'){({error}=await client.auth.resetPasswordForEmail(email,{redirectTo:process.env.APP_URL+'/auth/confirm?next=/reset-password'}));if(!error)redirect('/login?message=Si+la+cuenta+existe,+recibirás+un+correo');}
  else {({error}=await client.auth.signInWithPassword({email,password}));if(!error)redirect('/');}
