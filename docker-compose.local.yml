@@ -1,0 +1,5 @@
+# Acceso solo local. No usar este override para abrir puertos públicos.
+services:
+  web:
+    ports:
+      - "127.0.0.1:3000:3000"

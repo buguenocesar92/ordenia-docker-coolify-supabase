@@ -1,0 +1,2 @@
+import {getDb} from '../db';import {entries} from '../db/schema';import {eq} from 'drizzle-orm';import {folder,normalize} from './classify';
+export async function folderResolver(userId:string){const rows=await getDb().select({category:entries.category}).from(entries).where(eq(entries.userId,userId));const known=new Map(rows.map(x=>[normalize(x.category),x.category]));return (input:string)=>{const path=folder(input),key=normalize(path);if(!known.has(key))known.set(key,path);return known.get(key)!}}

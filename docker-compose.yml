@@ -1,0 +1,35 @@
+services:
+  migrate:
+    build: .
+    restart: "no"
+    command: ["node", "scripts/migrate.mjs"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Configura DATABASE_URL}
+      DATABASE_SSL: ${DATABASE_SSL:-true}
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - "3000"
+    environment:
+      APP_URL: ${APP_URL:?Configura APP_URL}
+      SUPABASE_URL: ${SUPABASE_URL:?Configura SUPABASE_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?Configura SUPABASE_PUBLISHABLE_KEY}
+      DATABASE_URL: ${DATABASE_URL:?Configura DATABASE_URL}
+      DATABASE_SSL: ${DATABASE_SSL:-true}
+      TZ: ${TZ:-America/Santiago}
+      N8N_INGEST_TOKEN: ${N8N_INGEST_TOKEN:?Configura N8N_INGEST_TOKEN}
+      WHATSAPP_ASSISTANT_NUMBER: ${WHATSAPP_ASSISTANT_NUMBER:-}
+      N8N_CLASSIFY_URL: ${N8N_CLASSIFY_URL:-}
+      N8N_CLASSIFY_TOKEN: ${N8N_CLASSIFY_TOKEN:-}
+      BITWARDEN_BRIDGE_URL: ${BITWARDEN_BRIDGE_URL:-}
+      BITWARDEN_BRIDGE_TOKEN: ${BITWARDEN_BRIDGE_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3

@@ -1,0 +1,6 @@
+import {pgSchema,text,boolean,uniqueIndex} from 'drizzle-orm/pg-core';
+const ordenia=pgSchema('ordenia');
+export const entries=ordenia.table('entries',{id:text('id').primaryKey(),userId:text('user_id').notNull(),kind:text('kind').notNull(),title:text('title').notNull(),original:text('original').notNull(),date:text('date'),time:text('time'),done:boolean('done').notNull().default(false),createdAt:text('created_at').notNull(),category:text('category').notNull().default('Personal / General'),recurrence:text('recurrence').notNull().default(''),source:text('source').notNull().default('web')});
+export const rules=ordenia.table('rules',{id:text('id').primaryKey(),userId:text('user_id').notNull(),keyword:text('keyword').notNull(),category:text('category').notNull(),kind:text('kind').notNull()},t=>[uniqueIndex('rules_user_keyword').on(t.userId,t.keyword)]);
+export const connections=ordenia.table('connections',{userId:text('user_id').primaryKey(),phone:text('phone'),verified:boolean('verified').notNull().default(false),codeHash:text('code_hash'),codeExpires:text('code_expires'),vaultUrl:text('vault_url')});
+export const deliveries=ordenia.table('deliveries',{id:text('id').primaryKey(),userId:text('user_id').notNull(),createdAt:text('created_at').notNull()});
