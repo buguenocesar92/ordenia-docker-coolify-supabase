@@ -25,7 +25,6 @@ CREATE ROLE ordenia_app LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION 
   PASSWORD '<generada-fuera-del-repo>' CONNECTION LIMIT 20;
 
 -- 2. Solo el esquema ordenia.
-REVOKE ALL ON DATABASE postgres FROM PUBLIC;           -- opcional; revisar el impacto en otros roles de Supabase antes
 GRANT CONNECT ON DATABASE postgres TO ordenia_app;
 GRANT USAGE ON SCHEMA ordenia TO ordenia_app;
 
