@@ -1,0 +1,3 @@
+import {requireUser} from '../auth';import {updatePassword} from '../login/actions';
+export const dynamic='force-dynamic';
+export default async function Reset({searchParams}:{searchParams:Promise<{message?:string}>}){await requireUser('/reset-password');const p=await searchParams;return <main className="panel" style={{maxWidth:440,margin:'8vh auto',padding:28}}><h1>Nueva contraseña</h1>{p.message&&<p>{p.message}</p>}<form action={updatePassword}><label className="field">Contraseña<input type="password" name="password" required minLength={8} autoComplete="new-password"/></label><button className="primary">Guardar contraseña</button></form></main>}

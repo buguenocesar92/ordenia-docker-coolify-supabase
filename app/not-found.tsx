@@ -1,0 +1,1 @@
+export default function NotFound(){return <main style={{margin:0,width:'100%',padding:60,textAlign:'center'}}><h1>No encontramos esta página</h1><p>Vuelve a tu espacio para continuar organizando tus mensajes.</p><a className="primary" style={{marginTop:25}} href="/">Abrir Ordenia →</a></main>}

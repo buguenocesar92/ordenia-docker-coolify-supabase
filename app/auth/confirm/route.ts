@@ -1,0 +1,4 @@
+import {supabase} from '../../../lib/supabase/server';import {NextResponse} from 'next/server';import type {EmailOtpType} from '@supabase/supabase-js';
+export async function GET(req:Request){const url=new URL(req.url);const client=await supabase();const code=url.searchParams.get('code'),token_hash=url.searchParams.get('token_hash'),type=url.searchParams.get('type');const next=url.searchParams.get('next')==='/reset-password'?'/reset-password':'/';let ok=false;
+ if(code){const {error}=await client.auth.exchangeCodeForSession(code);ok=!error;}else if(token_hash&&['signup','recovery','email','invite'].includes(type||'')){const {error}=await client.auth.verifyOtp({token_hash,type:type as EmailOtpType});ok=!error;}
+ return NextResponse.redirect(new URL(ok?next:'/login?message=Enlace+inválido+o+caducado',process.env.APP_URL!));}

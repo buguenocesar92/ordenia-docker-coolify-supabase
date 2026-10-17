@@ -1,0 +1,17 @@
+export type Kind='event'|'task'|'shop'|'note';
+export type Draft={kind:Kind;title:string;original:string;date:string;time:string;category?:string;recurrence?:string;source?:string;externalId?:string};
+export type Rule={keyword:string;category:string;kind:Kind};
+export const normalize=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+export function sensitive(s:string){return /(?:contrase[nñ]a|password|passwd|clave\s*(?:de|:|=)|api[_ -]?key|secret[_ -]?key|token\s*[:=]|BEGIN .*PRIVATE KEY)/i.test(s)}
+export function folder(s:string){return s.split(/[/>]/).map(x=>x.trim().replace(/\s+/g,' ')).filter(Boolean).slice(0,4).join(' / ').slice(0,120)||'Personal / General'}
+export function classify(text:string,now=new Date(),rules:Rule[]=[]):Draft[]{
+ const t=normalize(text),today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);let d=new Date(today+'T12:00:00Z'),date='';
+ const days=['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];if(/\bhoy\b/.test(t))date=today;else if(/\bmanana\b/.test(t)){d.setUTCDate(d.getUTCDate()+1);date=d.toISOString().slice(0,10)}else{const i=days.findIndex(x=>new RegExp('\\b'+x+'\\b').test(t));if(i>=0){d.setUTCDate(d.getUTCDate()+(i-d.getUTCDay()+7)%7);date=d.toISOString().slice(0,10)}}const explicit=t.match(/\b(\d{4}-\d{2}-\d{2})\b/);if(explicit)date=explicit[1];
+ const tm=t.match(/a las?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b|\b(\d{1,2}):(\d{2})\b/);let time='';if(tm){let h=Number(tm[1]||tm[4]);if(tm[3]==='pm'&&h<12)h+=12;if(tm[3]==='am'&&h===12)h=0;let m=tm[2]||tm[5]||'00';if(h<24&&Number(m)<60)time=String(h).padStart(2,'0')+':'+m}
+ let kind:Kind=/^(compra|comprar|agrega|anade)\b/.test(t)?'shop':/\b(dentista|cita|reunion|consulta|evento)\b/.test(t)?'event':/\b(entregar|terminar|hacer|enviar|pagar|recordar|tarea|ejercitar|entrenar)\b/.test(t)?'task':'note';
+ let category=kind==='shop'?'Hogar / Compras':'Personal / General';
+ if(/\b(ejerc\w*|entrenar|entrenamiento|gimnasio|rutina|deporte)\b/.test(t))category='Salud / Ejercicio';else if(/\b(dentista|medico|consulta|medicamento|salud)\b/.test(t))category='Salud / Citas';else if(/\b(laravel|nuxt|vue|curso|estudiar|practica|aprender)\b/.test(t))category=/laravel/.test(t)?'Aprendizaje / Laravel':/nuxt/.test(t)?'Aprendizaje / Nuxt':'Aprendizaje / General';else if(/\b(kraftdo|nfc)\b/.test(t))category=/promocion|marketing|publicidad/.test(t)?'KraftDo / Marketing':'KraftDo / Ideas';else if(/\b(factura|pagar|gasto|presupuesto)\b/.test(t))category='Finanzas / Pendientes';else if(/\b(trabajo|cliente|proyecto|reunion)\b/.test(t))category='Trabajo / General';
+ const rule=[...rules].sort((a,b)=>b.keyword.length-a.keyword.length).find(r=>t.includes(normalize(r.keyword)));if(rule){category=folder(rule.category);kind=rule.kind}
+ const recurrence=/tres veces por semana|3 veces por semana/.test(t)?'3 veces por semana':/todos los dias|cada dia|diariamente/.test(t)?'Diaria':/cada semana|semanal|cada lunes/.test(t)?'Semanal':'';
+ const titles=kind==='shop'?text.replace(/^(compra|comprar|agrega|añade)\s+/i,'').split(/,|\s+y\s+/).map(x=>x.trim()).filter(Boolean):[text.trim()];return titles.map(title=>({kind,title:title.charAt(0).toUpperCase()+title.slice(1),original:text,date:kind==='event'||kind==='task'?date:'',time:kind==='event'?time:'',category,recurrence,source:'web'}));
+}

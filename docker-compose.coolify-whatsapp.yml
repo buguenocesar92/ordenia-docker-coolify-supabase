@@ -1,0 +1,60 @@
+services:
+  migrate:
+    build: .
+    restart: "no"
+    command: ["node", "scripts/migrate.mjs"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Configura DATABASE_URL}
+      DATABASE_SSL: ${DATABASE_SSL:-true}
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - "3000"
+    environment:
+      APP_URL: ${APP_URL:?Configura APP_URL}
+      SUPABASE_URL: ${SUPABASE_URL:?Configura SUPABASE_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:?Configura SUPABASE_PUBLISHABLE_KEY}
+      DATABASE_URL: ${DATABASE_URL:?Configura DATABASE_URL}
+      DATABASE_SSL: ${DATABASE_SSL:-true}
+      TZ: ${TZ:-America/Santiago}
+      N8N_INGEST_TOKEN: ${N8N_INGEST_TOKEN:?Configura N8N_INGEST_TOKEN}
+      WHATSAPP_ASSISTANT_NUMBER: ${WHATSAPP_ASSISTANT_NUMBER:-}
+      N8N_CLASSIFY_URL: ${N8N_CLASSIFY_URL:-}
+      N8N_CLASSIFY_TOKEN: ${N8N_CLASSIFY_TOKEN:-}
+      BITWARDEN_BRIDGE_URL: ${BITWARDEN_BRIDGE_URL:-}
+      BITWARDEN_BRIDGE_TOKEN: ${BITWARDEN_BRIDGE_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+  whatsapp:
+    build:
+      context: .
+      dockerfile: integrations/Dockerfile.whatsapp
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    expose:
+      - "8789"
+    environment:
+      ORDENIA_URL: http://web:3000
+      N8N_INGEST_TOKEN: ${N8N_INGEST_TOKEN:?Configura N8N_INGEST_TOKEN}
+      META_APP_SECRET: ${META_APP_SECRET:?Configura META_APP_SECRET}
+      META_VERIFY_TOKEN: ${META_VERIFY_TOKEN:?Configura META_VERIFY_TOKEN}
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:?Configura META_ACCESS_TOKEN}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:?Configura WHATSAPP_PHONE_NUMBER_ID}
+      WHATSAPP_GRAPH_VERSION: ${WHATSAPP_GRAPH_VERSION:-v25.0}
+      AUDIO_TRANSCRIBE_URL: ${AUDIO_TRANSCRIBE_URL:-}
+      AUDIO_TRANSCRIBE_TOKEN: ${AUDIO_TRANSCRIBE_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8789/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
