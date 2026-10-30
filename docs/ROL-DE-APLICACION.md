@@ -16,7 +16,7 @@ Estado: **el codigo y la migracion estan preparados; activarlo es una decision o
 
 **Lo que falta, y es una decision de Cesar:** que la aplicacion se conecte con este rol y no
 con el administrador. Mientras `DATABASE_URL` apunte al rol administrador de Supabase
-(`postgres`), ese rol salta RLS y el aislamiento sigue Depending solo de los filtros
+(`postgres`), ese rol salta RLS y el aislamiento sigue dependiendo solo de los filtros
 `user_id` del codigo. Las politicas solo protegen cuando el rol que conecta **no** puede
 saltarselas.
 
@@ -73,9 +73,10 @@ filtran por `app.user_id`. Ninguna politica debe filtrar solo por rol: tiene que
 
 ## Límites honestos
 
-- El aislamiento real **no** se puede probar aqui: no hay instancia de Postgres de prueba en
-  este entorno. La prueba de aislamiento entre dos usuarios queda *skipped* con motivo
-  (`tests/rls.test.mjs`).
+- El aislamiento se prueba con `tests/rls-real.test.mjs` contra un Postgres desechable
+  (`ORDENIA_TEST_DATABASE_URL`): aplica las migraciones reales y usa un rol de aplicacion sin
+  superusuario ni `BYPASSRLS`, con filas de dos usuarios. Sin esa variable la prueba se omite con
+  motivo. **No** se probo contra Supabase self-hosted real.
 - Con Supabase self-hosted, `DATABASE_URL` debe apuntar al pooler/puerto que acepte el rol
   nuevo; verificar antes de cambiar nada.
 - El rol `ordenia_app` no puede ejecutar `scripts/migrate.mjs` (necesita `CREATE`): es lo

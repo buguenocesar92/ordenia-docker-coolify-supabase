@@ -30,16 +30,31 @@ Hasta que eso esté hecho, los pasos de abajo no se pueden ejecutar.
    (el `:3000` es el puerto interno al que apunta el proxy, no se publica al host). Los compose usan `expose`, no `ports`.
 6. 👤 **Meta (opcional, después).** Webhook `https://<dominio-webhook>/webhooks/whatsapp` con el verify token del paso 3.
    El servicio `whatsapp` expone el 8789 interno.
-7. **Comprobación.** `curl -fsS https://<dominio-ordenia>/api/health` debe responder `{"ok":true}`
+7. **Comprobación.** `curl -fsS https://<dominio-ordenia>/api/health` debe responder un JSON con las claves
+   `ok`, `version`, `uptime_s` y `db` (por ejemplo `{"ok":true,"version":"1.0.0","uptime_s":12,"db":"up"}`).
+   No se exige el cuerpo literal `{"ok":true}`: la respuesta lleva más campos.
    (503 = la app no llega a la base). Luego 👤 crear dos cuentas y verificar que cada una ve solo sus datos.
 
 ## Migraciones (manual, nunca automáticas en producción)
 
 Regla: nada toca el esquema de producción sin que una persona haya leído el SQL antes.
 
+> **Orden obligatorio:** `002_ordenia_rls.sql` debe estar aplicada **antes** de desplegar este código.
+> `/api/ingest` resuelve el titular del mensaje con las funciones `ordenia.usuario_por_telefono_verificado`
+> y `ordenia.enlace_por_codigo`, que crea `002`. Sin ellas, la ruta responde 500 y **todo** mensaje de
+> WhatsApp se pierde.
+>
+> **Con qué rol se aplica `002`:** la migración usa `FORCE ROW LEVEL SECURITY`, así que las tablas quedan
+> sujetas a sus políticas incluso para su dueño. Las funciones `SECURITY DEFINER` se ejecutan con los
+> privilegios de **su** dueño: si ese dueño es superusuario o tiene `BYPASSRLS`, saltan las políticas;
+> si es un rol normal, las propias funciones quedan sujetas a RLS y, como dentro no hay `app.user_id`
+> fijado, la política no se cumple y devuelven vacío (el webhook deja de resolver el titular).
+> Comprobar el rol que aplica la migración antes de aplicarla.
+
 1. 👤 Hacer respaldo de la base (y comprobar que se puede restaurar).
-2. 👤 Leer `supabase/migrations/*.sql` (hoy `001_ordenia.sql`). Las incluidas no eliminan tablas; las futuras hay que
-   revisarlas igual. `scripts/migrate.mjs` registra lo aplicado en `ordenia.migrations`, así que repetirlo no duplica.
+2. 👤 Leer `supabase/migrations/*.sql` (hoy `001_ordenia.sql` y `002_ordenia_rls.sql`). Las incluidas no
+   eliminan tablas; las futuras hay que revisarlas igual. `scripts/migrate.mjs` registra lo aplicado en
+   `ordenia.migrations`, así que repetirlo no duplica.
 3. 👤 Aplicar a mano, con una de estas dos vías:
    - Dejando que el script lo haga, solo tras revisar: desde el servidor con el repo desplegado,
      `docker compose --profile migrate run --rm migrate` (usa `DATABASE_URL` y `DATABASE_SSL` del entorno).
