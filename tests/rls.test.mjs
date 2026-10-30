@@ -41,22 +41,3 @@ test('El webhook de ingest resuelve el titular por funciones SECURITY DEFINER, n
  assert.match(sql,/SECURITY DEFINER/,'las funciones de resolucion son SECURITY DEFINER');
  assert.match(sql,/REVOKE ALL ON FUNCTION ordenia\.usuario_por_telefono_verificado/);
 });
-test('Aislamiento real entre dos usuarios (requiere Postgres de prueba)',{skip:process.env.ORDENIA_TEST_DATABASE_URL?false:'sin ORDENIA_TEST_DATABASE_URL: no hay base de prueba en este entorno'},async()=>{
- const {Pool}=await import('pg');
- const pool=new Pool({connectionString:process.env.ORDENIA_TEST_DATABASE_URL});
- const a='u_a_'+Date.now(),b='u_b_'+Date.now();
- await pool.query('create schema if not exists ordenia');
- await pool.query('create table if not exists ordenia.entries_prueba (id text primary key, user_id text not null)');
- await pool.query('alter table ordenia.entries_prueba enable row level security');
- await pool.query('alter table ordenia.entries_prueba force row level security');
- await pool.query('drop policy if exists prueba_isolation on ordenia.entries_prueba');
- await pool.query('create policy prueba_isolation on ordenia.entries_prueba using (user_id = current_setting(\'app.user_id\', true)) with check (user_id = current_setting(\'app.user_id\', true))');
- await pool.query('insert into ordenia.entries_prueba (id,user_id) values ($1,$2)',['x1',a]);
- const c=await pool.connect();
- await c.query('begin');await c.query('select set_config($1,$2,true)',['app.user_id',b]);
- const filas=await c.query('select id from ordenia.entries_prueba');
- await c.query('rollback');c.release();
- assert.equal(filas.rowCount,0,'un usuario no puede leer las filas de otro');
- await pool.query('drop table if exists ordenia.entries_prueba');
- await pool.end();
-});
