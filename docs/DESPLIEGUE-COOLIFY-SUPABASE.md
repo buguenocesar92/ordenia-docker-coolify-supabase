@@ -53,14 +53,20 @@ Regla: nada toca el esquema de producción sin que una persona haya leído el SQ
 
 1. 👤 Hacer respaldo de la base (y comprobar que se puede restaurar).
 2. 👤 Leer `supabase/migrations/*.sql` (hoy `001_ordenia.sql` y `002_ordenia_rls.sql`). Las incluidas no
-   eliminan tablas; las futuras hay que revisarlas igual. `scripts/migrate.mjs` registra lo aplicado en
-   `ordenia.migrations`, así que repetirlo no duplica.
+   eliminan tablas; las futuras hay que revisarlas igual. Ojo: `scripts/migrate.mjs` **solo** aplica y
+   registra `001_ordenia.sql` (su `version` está fijada a `001_ordenia`); **no** aplica `002`, así que
+   usarlo da por hecho un estado que en la base no existe.
 3. 👤 Aplicar a mano, con una de estas dos vías:
-   - Dejando que el script lo haga, solo tras revisar: desde el servidor con el repo desplegado,
-     `docker compose --profile migrate run --rm migrate` (usa `DATABASE_URL` y `DATABASE_SSL` del entorno).
-     En Coolify, abrir la terminal del recurso o hacerlo por SSH en el host; no añadir `migrate` como servicio de despliegue.
-   - O ejecutando el SQL revisado con `psql` contra la base, con una URL de administración que no se guarde en el repo.
-4. Desplegar/reiniciar `web` y comprobar `/api/health`.
+   - **Para `001_ordenia.sql`**: dejando que el script lo haga, solo tras revisar: desde el servidor con el
+     repo desplegado, `docker compose --profile migrate run --rm migrate` (usa `DATABASE_URL` y
+     `DATABASE_SSL` del entorno). En Coolify, abrir la terminal del recurso o hacerlo por SSH en el host;
+     no añadir `migrate` como servicio de despliegue.
+   - **Para `002_ordenia_rls.sql`**: la vía del script **no** sirve (ver el paso 2). Aplicar el SQL revisado
+     con `psql` contra la base, con una URL de administración que no se guarde en el repo.
+4. 👤 Comprobar, **antes** de desplegar, que las dos funciones de `002` existen en la base:
+   `psql "<url de administración>" -c "\df ordenia.usuario_por_telefono_verificado"` y lo mismo con
+   `ordenia.enlace_por_codigo`. Si no aparecen, `/api/ingest` responderá 500 a todo mensaje de WhatsApp.
+5. Desplegar/reiniciar `web` y comprobar `/api/health`.
 
 Se validó con `docker compose config` que `migrate` solo aparece con `--profile migrate`. No se probó cómo trata
 Coolify los perfiles de Compose: tras el primer despliegue, confirmar que no levantó `migrate`.

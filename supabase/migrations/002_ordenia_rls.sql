@@ -11,8 +11,9 @@
 -- rol de aplicacion (NOBYPASSRLS) descrito en docs/ROL-DE-APLICACION.md, no con el rol
 -- administrador. Ese cambio de DATABASE_URL es una decision operativa: ver ese documento.
 --
--- Aplicar SOLO en base de prueba. Para revertir: DROP POLICY, ALTER TABLE ... NO FORCE ROW
--- LEVEL SECURITY y borrar este fichero.
+-- Probar primero en base de prueba; en produccion debe aplicarse, con respaldo, antes de desplegar
+-- este codigo (ver docs/DESPLIEGUE-COOLIFY-SUPABASE.md). Para revertir: DROP POLICY, ALTER TABLE ...
+-- NO FORCE ROW LEVEL SECURITY y borrar este fichero.
 
 REVOKE ALL ON SCHEMA ordenia FROM PUBLIC, anon, authenticated;
 

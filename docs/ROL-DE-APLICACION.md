@@ -63,9 +63,12 @@ filtran por `app.user_id`. Ninguna politica debe filtrar solo por rol: tiene que
 
 ## Como se activa
 
-1. Crear el rol y aplicar los `GRANT` (comando de administrador).
-2. Aplicar `supabase/migrations/002_ordenia_rls.sql` en la base de **prueba** y recorrer el
-   flujo completo: crear nota, mover, borrar, vincular WhatsApp, `/api/health`.
+1. Aplicar `supabase/migrations/002_ordenia_rls.sql`: primero en la base de **prueba**, recorriendo el
+   flujo completo (crear nota, mover, borrar, vincular WhatsApp, `/api/health`), y en **producción**
+   antes de desplegar este código, con respaldo (ver `docs/DESPLIEGUE-COOLIFY-SUPABASE.md`).
+2. Crear el rol y aplicar los `GRANT` (comando de administrador). Los `GRANT EXECUTE` sobre las
+   funciones de resolución necesitan que `002` ya esté aplicada: si no, fallan con
+   "function does not exist".
 3. Cambiar `DATABASE_URL` del despliegue a la del rol `ordenia_app` (ventana de mantenimiento:
    la web y el receptor de WhatsApp se reinician).
 4. Comprobar que el receptor de WhatsApp sigue funcionando: usa las funciones `SECURITY
