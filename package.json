@@ -11,12 +11,15 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0",
     "check": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "data:import": "node --env-file-if-exists=.env scripts/import-sites.mjs",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "test:respaldo": "bats tests/backup_restore.bats"
   },
   "dependencies": {
-    "next": "16.3.4",
+    "next": "16.4.3",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "drizzle-orm": "0.45.2",

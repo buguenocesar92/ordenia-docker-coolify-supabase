@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, 'plan/**', 'feature/**', 'bugfix/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  calidad:
+    name: Suite, lint, typecheck, build y secretos
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar dependencias
+        # bats para el ciclo de respaldo; el resto viene con el runner.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+
+      - name: Instalar Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Instalar dependencias del proyecto
+        run: npm ci
+
+      - name: Lint (ESLint)
+        # eslint todavia no esta declarado como devDep: la instalacion de paquetes no esta
+        # autorizada en esta fase. El paso queda como aviso hasta que la devDep entre
+        # (ver el informe de ejecucion). No se reporta como puerta verde.
+        run: |
+          npm run lint --if-present || echo "lint omitido: eslint no declarado todavia"
+        continue-on-error: true
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        # El build va antes que los tests: las pruebas de arranque standalone necesitan
+        # .next/standalone/server.js. Sin build, esas pruebas se omiten con motivo.
+        run: npm run build
+
+      - name: Suite de tests
+        run: npm test
+
+      - name: Ciclo de respaldo (bats)
+        run: bats tests/backup_restore.bats
+
+      - name: Shellcheck de los scripts de respaldo
+        run: shellcheck -S warning scripts/respaldo.sh scripts/restaurar.sh
+
+      - name: Secretos (gitleaks)
+        # Version fijada, sin accion oficial: la accion de gitleaks pide licencia
+        # en organizaciones y esta cuenta es personal. Se escanea el repositorio y su
+        # historial antes del build, para no analizar artefactos generados.
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz | tar xz gitleaks
+          sudo mv gitleaks /usr/local/bin/
+          gitleaks detect --source . --no-banner --redact
