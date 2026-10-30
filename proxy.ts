@@ -5,7 +5,10 @@ import {log} from './lib/log';
 const SESSION_PATHS=/^\/($|login$|reset-password$|auth(\/|$)|api\/(entries|classify|rules|connections|vault)$)/;
 export async function proxy(request:NextRequest){
  // Identidad de la peticion: viaja en x-request-id para poder correlacionar el log con la respuesta.
- const requestId=request.headers.get('x-request-id')||crypto.randomUUID();
+ // El valor lo elige el cliente, asi que se acota a un formato simple y corto: si no lo cumple,
+ // se genera uno propio. Devolverlo sin validar dejaria al cliente escribir en los logs.
+ const recibido=request.headers.get('x-request-id')||'';
+ const requestId=/^[A-Za-z0-9_-]{1,64}$/.test(recibido)?recibido:crypto.randomUUID();
  const inicio=Date.now();
  const nonce=btoa(crypto.randomUUID());
  const csp=buildCsp(nonce,{isDev:process.env.NODE_ENV==='development',https:isHttps(process.env.APP_URL)});
