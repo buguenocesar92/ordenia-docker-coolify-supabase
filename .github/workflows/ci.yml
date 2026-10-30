@@ -35,7 +35,8 @@ jobs:
         # eslint todavia no esta declarado como devDep: la instalacion de paquetes no esta
         # autorizada en esta fase. El paso queda como aviso hasta que la devDep entre
         # (ver el informe de ejecucion). No se reporta como puerta verde.
-        run: npm run lint --if-present || echo "lint omitido: eslint no declarado todavia"
+        run: |
+          npm run lint --if-present || echo "lint omitido: eslint no declarado todavia"
         continue-on-error: true
 
       - name: Typecheck

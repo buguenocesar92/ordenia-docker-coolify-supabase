@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {readFileSync,existsSync} from 'node:fs';import path from 'node:path';
+import {spawnSync} from 'node:child_process';import {test} from 'node:test';import assert from 'node:assert/strict';import {readFileSync,existsSync} from 'node:fs';import path from 'node:path';
 const raiz=path.resolve(import.meta.dirname,'..');
 const leer=(p)=>readFileSync(path.join(raiz,p),'utf8');
 const pkg=JSON.parse(leer('package.json'));
@@ -28,4 +28,8 @@ test('El repositorio tiene configuracion de gitleaks versionada',()=>{
  assert.ok(existsSync(path.join(raiz,'.gitleaks.toml')),'falta .gitleaks.toml');
  const g=leer('.gitleaks.toml');
  assert.match(g,/useDefault\s*=\s*true/,'gitleaks debe partir de la configuracion por defecto');
+});
+test('El workflow es YAML valido: si no, GitHub no ejecuta ningun job',()=>{
+ const r=spawnSync('python3',['-c','import sys,yaml;yaml.safe_load(open(sys.argv[1]))','.github/workflows/ci.yml'],{cwd:path.resolve(import.meta.dirname,'..'),encoding:'utf8'});
+ assert.equal(r.status,0,r.stderr);
 });
