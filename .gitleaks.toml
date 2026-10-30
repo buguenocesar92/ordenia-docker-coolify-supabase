@@ -1,0 +1,15 @@
+title = "ordenia"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = """
+El build de Next (.next/) no es codigo versionado: son artefactos generados que pueden
+contener identificadores de build que el detector toma por claves. No se escanean.
+Lo mismo con las dependencias instaladas (node_modules/).
+"""
+paths = [
+  '''\.next/''',
+  '''node_modules/''',
+]
