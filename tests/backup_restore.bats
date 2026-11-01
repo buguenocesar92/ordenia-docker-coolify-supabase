@@ -243,6 +243,24 @@ NODE
   [ "$?" -eq 0 ]
 }
 
+@test "la auditoria redige la contrasena de una URL sin usuario" {
+  respaldo
+  [ "$status" -eq 0 ]
+  c="$(carpeta)"
+
+  clave_audit="sin-usuario-${BATS_TEST_NUMBER}-${RANDOM}"
+  destino="postgresql://:${clave_audit}@localhost/ordenia_prueba"
+
+  run bash "$RAIZ/scripts/restaurar.sh" "$c" "$destino" --confirmar CONFIRMAR_RESTAURACION
+  echo "status=$status output=$output"
+  [ "$status" -eq 0 ]
+
+  run cat "$TMP/logs/restore.log"
+  echo "$output"
+  [[ "$output" != *"$clave_audit"* ]]
+  [[ "$output" == *"[REDACTED]"* ]]
+}
+
 @test "la auditoria sigue siendo JSON valido con comillas y barras en los campos" {
   respaldo
   [ "$status" -eq 0 ]

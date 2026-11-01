@@ -133,7 +133,7 @@ redactar_conexion() {
   node --input-type=module - "$1" <<'NODE'
 const valor=process.argv[2] ?? '';
 const resultado=valor
-  .replace(/(postgres(?:ql)?:\/\/[^/:@]+:)[^@/]*@/gi,'$1[REDACTED]@')
+  .replace(/(postgres(?:ql)?:\/\/[^/:@]*:)[^@/]*@/gi,'$1[REDACTED]@')
   .replace(/([?&](?:password|pass|pwd)=)[^&\s]*/gi,'$1[REDACTED]')
   .replace(
     /(^|\s)(password|pass|pwd)=("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s]*)/gi,
@@ -189,6 +189,7 @@ resultado_json="$(json_cadena "$resultado")"
 printf '{\n  "ts": %s,\n  "origen": %s,\n  "sha256_verificado": %s,\n  "destino": %s,\n  "resultado": %s\n}\n' \
   "$ts_json" "$origen_json" "$sha_json" "$destino_json" "$resultado_json" \
   > "$origen/restore-report.json"
+chmod 600 "$origen/restore-report.json"
 
 auditar 'ok'
 echo 'Datos restaurados. Revisa aislamiento y notificaciones antes de arrancar el servicio.'
