@@ -19,7 +19,10 @@ DATABASE='postgresql'
 VERSION="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$RAIZ/package.json" | head -1)"
 [ -n "$VERSION" ] || VERSION='desconocida'
 
-DESTINO="$RAIZ/backups"
+# El destino por defecto vive FUERA del arbol del repositorio: un dump con
+# datos personales no puede quedar a un commit de distancia. --destino manda
+# sobre este valor.
+DESTINO="${ORDENIA_BACKUP_DIR:-${XDG_STATE_HOME:-/var/lib}/ordenia/backups}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --destino)

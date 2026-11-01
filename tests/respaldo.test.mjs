@@ -35,3 +35,14 @@ test('La suite bats ejercita el ciclo backup -> restore con datos sinteticos',{s
  assert.equal(r.status,0,(r.stdout||'')+(r.stderr||''));
  assert.match(r.stdout||'',/ok 1/);
 });
+test('El destino predeterminado del respaldo queda fuera del worktree',()=>{
+ const src=leer('scripts/respaldo.sh');
+ assert.match(src,/ORDENIA_BACKUP_DIR/);
+ assert.match(src,/XDG_STATE_HOME/);
+ assert.doesNotMatch(src,/DESTINO="\$RAIZ\/backups"/);
+});
+test('Los artefactos locales de respaldo y auditoria estan ignorados',()=>{
+ const gitignore=leer('.gitignore');
+ assert.match(gitignore,/^backups\/$/m);
+ assert.match(gitignore,/^logs\/$/m);
+});
