@@ -3,15 +3,14 @@ import {parseYaml,ErrorYaml} from './yaml-mini.mjs';
 const raiz=path.resolve(import.meta.dirname,'..');
 const leer=(p)=>readFileSync(path.join(raiz,p),'utf8');
 const pkg=JSON.parse(leer('package.json'));
-test('Existe el workflow de CI con las puertas del proyecto',()=>{
+test('Existe el workflow de CI y la CI corre en Node 22',()=>{
  assert.ok(existsSync(path.join(raiz,'.github/workflows/ci.yml')),'falta .github/workflows/ci.yml');
- const yml=leer('.github/workflows/ci.yml');
- assert.match(yml,/lint/,'falta la puerta de lint');
- assert.match(yml,/typecheck|npm run check/,'falta la puerta de typecheck');
- assert.match(yml,/npm (ci|test)/,'falta la puerta de tests');
- assert.match(yml,/npm run build/,'falta la puerta de build');
- assert.match(yml,/gitleaks/,'falta el escaneo de secretos');
- assert.match(yml,/node-version:\s*'?22/,'la CI debe correr Node 22');
+ const w=parseYaml(leer('.github/workflows/ci.yml'));
+ const pasos=w.jobs.calidad.steps;
+ const setup=pasos.find((p)=>typeof p.uses==='string'&&p.uses.startsWith('actions/setup-node'));
+ assert.ok(setup,'falta el paso que instala Node');
+ assert.ok(setup.with,'setup-node debe declarar "with"');
+ assert.equal(String(setup.with['node-version']),'22','la CI debe correr Node 22');
 });
 test('La CI no despliega, no aplica migraciones y no publica secretos',()=>{
  const yml=leer('.github/workflows/ci.yml');
@@ -67,4 +66,50 @@ test('El validador del workflow no es vacioso',()=>{
  assert.throws(()=>parseYaml('jobs:\n  a: 1\n  a: 2\n'),ErrorYaml,'una clave duplicada debe rechazarse');
  assert.throws(()=>parseYaml('jobs:\n\t a: 1\n'),ErrorYaml,'la indentacion con tabulador debe rechazarse');
  assert.throws(()=>parseYaml('jobs:\n  a: 1\n   b: 2\n'),ErrorYaml,'una indentacion inconsistente debe rechazarse');
+});
+test('La CI contiene los comandos reales de calidad en pasos ejecutables',()=>{
+ const workflow=parseYaml(leer('.github/workflows/ci.yml'));
+ const pasos=workflow.jobs.calidad.steps;
+
+ const comandos=pasos
+  .filter((paso)=>typeof paso.run==='string')
+  .map((paso)=>paso.run
+   .split('\n')
+   .map((linea)=>linea.trim())
+   .filter(Boolean));
+
+ const tieneLinea=(esperada)=>{
+  assert.ok(
+   comandos.some((bloque)=>bloque.some((linea)=>linea.includes(esperada))),
+   `falta el comando ejecutable: ${esperada}`
+  );
+ };
+
+ tieneLinea('npm ci');
+ tieneLinea('npm run typecheck');
+ tieneLinea('npm run build');
+ tieneLinea('npm test');
+ tieneLinea('bats tests/backup_restore.bats');
+ tieneLinea('shellcheck -S warning scripts/respaldo.sh scripts/restaurar.sh');
+ tieneLinea('gitleaks detect --source . --no-banner --redact');
+ tieneLinea('npm run lint --if-present || echo');
+});
+test('Los requisitos de CI no pueden satisfacerse solo con nombres de pasos',()=>{
+ const workflow=parseYaml(leer('.github/workflows/ci.yml'));
+ const pasos=workflow.jobs.calidad.steps;
+ const runs=pasos
+  .filter((paso)=>typeof paso.run==='string')
+  .flatMap((paso)=>paso.run.split('\n').map((linea)=>linea.trim()));
+
+ for(const comando of [
+  'npm ci',
+  'npm run typecheck',
+  'npm run build',
+  'npm test',
+  'bats tests/backup_restore.bats',
+  'shellcheck -S warning scripts/respaldo.sh scripts/restaurar.sh',
+  'gitleaks detect --source . --no-banner --redact'
+ ]){
+  assert.ok(runs.includes(comando),`no se ejecuto realmente: ${comando}`);
+ }
 });
