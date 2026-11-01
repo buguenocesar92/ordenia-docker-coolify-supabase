@@ -15,6 +15,10 @@ jobs:
     steps:
       - name: Descargar el repositorio
         uses: actions/checkout@v4
+        with:
+          # gitleaks escanea el repositorio y su historial: con el fetch-depth
+          # por defecto (1) el escaneo no cubre los commits anteriores.
+          fetch-depth: 0
 
       - name: Instalar dependencias
         # bats para el ciclo de respaldo; el resto viene con el runner.
