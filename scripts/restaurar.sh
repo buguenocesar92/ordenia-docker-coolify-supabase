@@ -5,7 +5,7 @@
 # Codigos de salida:
 #   0  respaldo integro / restaurado
 #   1  uso incorrecto
-#   2  manifiesto, checksum o destino invalidos
+#   2  manifiesto, checksum, destino invalido o restauracion fallida
 #   3  falta la confirmacion explicita
 #   4  material sensible en claro dentro del respaldo
 #
@@ -67,7 +67,7 @@ DIGESTO="$(valor sha256)"
 [ -f "$origen/data.dump" ] || { echo 'ERROR: falta data.dump' >&2; exit 2; }
 [ -f "$origen/SHA256SUMS" ] || { echo 'ERROR: falta SHA256SUMS' >&2; exit 2; }
 ( cd "$origen" && sha256sum -c --status SHA256SUMS ) || { echo 'ERROR: el checksum no cuadra' >&2; exit 2; }
-[ "$(sha256sum "$origen/data.dump" | cut -d' ' -f1)" = "$DIGESTO" ] || { echo 'ERROR: el sha256 del manifiesto no cuadra con el dump' >&2; exit 2; }
+[ "$( cd "$origen" && sha256sum data.dump | cut -d' ' -f1 )" = "$DIGESTO" ] || { echo 'ERROR: el sha256 del manifiesto no cuadra con el dump' >&2; exit 2; }
 
 # Material sensible en claro: si algun valor del .env aparece dentro del respaldo,
 # el respaldo no se restaura. Solo se reporta el NOMBRE de la variable, nunca el valor.
@@ -109,6 +109,10 @@ command -v psql >/dev/null || {
   echo 'ERROR: falta psql (postgresql-client): no se puede comprobar que el destino este vacio' >&2
   exit 2
 }
+command -v node >/dev/null || {
+  echo 'ERROR: falta node: sin el no se puede auditar la restauracion sin filtrar credenciales' >&2
+  exit 2
+}
 TABLAS="$(psql "$destino" -tAc "select count(*) from information_schema.tables where table_schema='ordenia'" 2>/dev/null || echo ERROR)"
 case "$TABLAS" in
   0) ;;
@@ -116,14 +120,48 @@ case "$TABLAS" in
   *) echo 'ERROR: el destino no esta vacio: restauracion cancelada.' >&2; exit 2;;
 esac
 
-# En la auditoria nunca se escriben credenciales: el destino va sin usuario ni contrasena.
-DESTINO_LIMPIO="$(printf '%s' "$destino" | sed -E 's#(://)[^/@]*@#\1#')"
+# En la auditoria nunca se escriben credenciales: el destino va redactado, tanto
+# si viene como URL (postgresql://usuario:clave@host) como si viene como
+# conninfo (host=... password=clave). Los valores entre comillas tambien.
+json_cadena() {
+  node --input-type=module - "$1" <<'NODE'
+process.stdout.write(JSON.stringify(process.argv[2] ?? ''));
+NODE
+}
+
+redactar_conexion() {
+  node --input-type=module - "$1" <<'NODE'
+const valor=process.argv[2] ?? '';
+const resultado=valor
+  .replace(/(postgres(?:ql)?:\/\/[^/:@]+:)[^@/]*@/gi,'$1[REDACTED]@')
+  .replace(/([?&](?:password|pass|pwd)=)[^&\s]*/gi,'$1[REDACTED]')
+  .replace(
+    /(^|\s)(password|pass|pwd)=("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^\s]*)/gi,
+    '$1$2=[REDACTED]'
+  );
+process.stdout.write(resultado);
+NODE
+}
+
+DESTINO_LIMPIO="$(redactar_conexion "$destino")"
+
 auditar() {
   local resultado="$1"
+  local ts_json origen_json sha_json destino_json resultado_json
+
   mkdir -p "$LOG_DIR"
   chmod 700 "$LOG_DIR" 2>/dev/null || true
-  printf '{"ts": "%s", "accion": "restore", "origen": "%s", "sha256_verificado": "%s", "destino": "%s", "resultado": "%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$origen" "$DIGESTO" "$DESTINO_LIMPIO" "$resultado" >> "$LOG_DIR/restore.log"
+
+  ts_json="$(json_cadena "$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
+  origen_json="$(json_cadena "$origen")"
+  sha_json="$(json_cadena "$DIGESTO")"
+  destino_json="$(json_cadena "$DESTINO_LIMPIO")"
+  resultado_json="$(json_cadena "$resultado")"
+
+  printf '{"ts":%s,"accion":"restore","origen":%s,"sha256_verificado":%s,"destino":%s,"resultado":%s}\n' \
+    "$ts_json" "$origen_json" "$sha_json" "$destino_json" "$resultado_json" \
+    >> "$LOG_DIR/restore.log"
+
   chmod 600 "$LOG_DIR/restore.log"
 }
 
@@ -133,15 +171,24 @@ if [ "$modo" = 'dry-run' ]; then
   exit 0
 fi
 
-pg_restore --exit-on-error --dbname="$destino" "$origen/data.dump"
-cat > "$origen/restore-report.json" <<JSON
-{
-  "ts": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "origen": "$origen",
-  "sha256_verificado": "$DIGESTO",
-  "destino": "$DESTINO_LIMPIO",
-  "resultado": "ok"
-}
-JSON
+if pg_restore --exit-on-error --dbname="$destino" "$origen/data.dump"; then
+  resultado='ok'
+else
+  auditar 'error'
+  echo 'ERROR: pg_restore fallo; la restauracion no se considera completada.' >&2
+  exit 2
+fi
+
+# El reporte usa el mismo escape que la auditoria: ningun campo se interpola crudo.
+ts_json="$(json_cadena "$(date -u +%Y-%m-%dT%H:%M:%SZ)")"
+origen_json="$(json_cadena "$origen")"
+sha_json="$(json_cadena "$DIGESTO")"
+destino_json="$(json_cadena "$DESTINO_LIMPIO")"
+resultado_json="$(json_cadena "$resultado")"
+
+printf '{\n  "ts": %s,\n  "origen": %s,\n  "sha256_verificado": %s,\n  "destino": %s,\n  "resultado": %s\n}\n' \
+  "$ts_json" "$origen_json" "$sha_json" "$destino_json" "$resultado_json" \
+  > "$origen/restore-report.json"
+
 auditar 'ok'
 echo 'Datos restaurados. Revisa aislamiento y notificaciones antes de arrancar el servicio.'

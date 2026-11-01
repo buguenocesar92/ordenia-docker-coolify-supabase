@@ -31,8 +31,14 @@ STUB
   cat > "$BIN/pg_restore" <<'STUB'
 #!/usr/bin/env bash
 # Stub de pg_restore: no restaura nada, solo deja rastro de que se llamo.
+# STUB_PG_RESTORE_FAIL=1 simula un fallo de restauracion.
 set -uo pipefail
 printf '%s\n' "$*" >> "${STUB_LOG_RESTORE:-/dev/null}"
+
+if [ "${STUB_PG_RESTORE_FAIL:-0}" = "1" ]; then
+  exit 17
+fi
+
 exit 0
 STUB
 
@@ -188,8 +194,8 @@ carpeta() { find "$DESTINO" -mindepth 1 -maxdepth 1 -type d | head -1; }
   [ -f "$TMP/logs/restore.log" ]
   run cat "$TMP/logs/restore.log"
   echo "$output"
-  [[ "$output" == *'"accion": "restore"'* ]]
-  [[ "$output" == *'"resultado": "ok"'* ]]
+  [[ "$output" == *'"accion":"restore"'* ]]
+  [[ "$output" == *'"resultado":"ok"'* ]]
   [[ "$output" == *"$digest"* ]]
 }
 
@@ -203,4 +209,81 @@ carpeta() { find "$DESTINO" -mindepth 1 -maxdepth 1 -type d | head -1; }
   run cat "$TMP/logs/restore.log"
   echo "$output"
   [[ "$output" != *"clave-secreta"* ]]
+}
+
+@test "la auditoria redige credenciales en URL y conninfo clave=valor" {
+  respaldo
+  [ "$status" -eq 0 ]
+  c="$(carpeta)"
+
+  clave_audit="audit-${BATS_TEST_NUMBER}-${RANDOM}"
+  destino="host=localhost dbname=ordenia_prueba user=usuario password=${clave_audit}"
+
+  run bash "$RAIZ/scripts/restaurar.sh" "$c" "$destino" --confirmar CONFIRMAR_RESTAURACION
+  echo "status=$status output=$output"
+  [ "$status" -eq 0 ]
+
+  run cat "$TMP/logs/restore.log"
+  echo "$output"
+  [[ "$output" != *"$clave_audit"* ]]
+  [[ "$output" == *"[REDACTED]"* ]]
+
+  # El reporte de restauracion tampoco puede quedar con la contrasena.
+  [ -f "$c/restore-report.json" ]
+  run cat "$c/restore-report.json"
+  echo "$output"
+  [[ "$output" != *"$clave_audit"* ]]
+
+  # Y debe seguir siendo JSON valido.
+  node --input-type=module - "$c/restore-report.json" <<'NODE'
+import {readFileSync} from 'node:fs';
+const reporte=JSON.parse(readFileSync(process.argv[2],'utf8'));
+if(reporte.resultado!=='ok') process.exit(1);
+NODE
+  [ "$?" -eq 0 ]
+}
+
+@test "la auditoria sigue siendo JSON valido con comillas y barras en los campos" {
+  respaldo
+  [ "$status" -eq 0 ]
+  c="$(carpeta)"
+
+  origen_especial="$TMP/origen \"audit\"\\ruta"
+  mv "$c" "$origen_especial"
+
+  destino='host=localhost dbname=ordenia_prueba user=usuario application_name="audit campo"'
+
+  run bash "$RAIZ/scripts/restaurar.sh" "$origen_especial" "$destino" --dry-run
+  echo "status=$status output=$output"
+  [ "$status" -eq 0 ]
+
+  node --input-type=module - "$TMP/logs/restore.log" "$origen_especial" <<'NODE'
+import {readFileSync} from 'node:fs';
+
+const log=readFileSync(process.argv[2],'utf8').trim().split('\n').at(-1);
+const esperado=process.argv[3];
+const entrada=JSON.parse(log);
+
+if(entrada.origen!==esperado) process.exit(1);
+if(entrada.resultado!=='dry-run') process.exit(1);
+NODE
+  [ "$?" -eq 0 ]
+}
+
+@test "un pg_restore fallido deja auditoria con resultado error" {
+  respaldo
+  [ "$status" -eq 0 ]
+  c="$(carpeta)"
+  export STUB_PG_RESTORE_FAIL=1
+
+  run bash "$RAIZ/scripts/restaurar.sh" "$c" \
+    "host=localhost dbname=ordenia_prueba user=usuario" \
+    --confirmar CONFIRMAR_RESTAURACION
+  echo "status=$status output=$output"
+  [ "$status" -ne 0 ]
+
+  [ -f "$TMP/logs/restore.log" ]
+  run tail -n 1 "$TMP/logs/restore.log"
+  echo "$output"
+  [[ "$output" == *'"resultado":"error"'* ]]
 }
